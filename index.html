@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>通過シナリオ管理 - TRPG / マダミス</title>
+<style>
+  :root{
+    --bg:#f6f5f2; --panel:#ffffff; --ink:#23201c; --sub:#6b655d;
+    --line:#e3ded6; --accent:#7a5a3a; --accent2:#9b7b52;
+    --trpg:#2f6f4f; --mada:#8a3b57; --star:#e0a52b; --danger:#b3402f;
+    --chip:#efeae1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1c1a17; --panel:#26231f; --ink:#ece7df; --sub:#a49c8f;
+      --line:#3a352e; --accent:#c9a878; --accent2:#b18f63; --chip:#332f28;
+      --trpg:#68b98d; --mada:#d78aa2; --star:#e9bd57;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;
+    font-size:15px;line-height:1.6}
+  header{padding:18px 20px;border-bottom:1px solid var(--line);
+    background:var(--panel);position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:19px;letter-spacing:.02em}
+  header .sub{color:var(--sub);font-size:12.5px;margin-top:3px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    margin-bottom:14px}
+  .toolbar .grow{flex:1 1 200px;min-width:160px}
+  input,select,textarea,button{font:inherit;color:inherit}
+  input[type=text],input[type=date],input[type=url],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line);
+    border-radius:8px;background:var(--panel)}
+  textarea{resize:vertical;min-height:70px}
+  .btn{border:1px solid var(--line);background:var(--panel);
+    padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;
+    transition:.15s}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{background:var(--accent2)}
+  .btn.ghost{background:transparent}
+  .count{color:var(--sub);font-size:13px;margin-left:auto}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;
+    background:var(--panel)}
+  table{border-collapse:collapse;width:100%;min-width:760px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);
+    vertical-align:top}
+  th{font-size:12.5px;color:var(--sub);font-weight:600;cursor:pointer;
+    white-space:nowrap;user-select:none;position:sticky;top:0;background:var(--panel)}
+  th.sortable:hover{color:var(--accent)}
+  th .arrow{opacity:.5;font-size:10px}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--chip)}
+  .kind{display:inline-block;padding:2px 9px;border-radius:999px;
+    font-size:12px;color:#fff;white-space:nowrap}
+  .kind.TRPG{background:var(--trpg)}
+  .kind.マダミス{background:var(--mada)}
+  .chip{display:inline-block;padding:2px 8px;border-radius:6px;
+    background:var(--chip);font-size:12.5px;white-space:nowrap}
+  .members{color:var(--ink)}
+  .stars{color:var(--star);letter-spacing:1px;white-space:nowrap}
+  .stars .off{color:var(--line)}
+  .linkcell a{color:var(--accent);text-decoration:none}
+  .linkcell a:hover{text-decoration:underline}
+  .empty{padding:48px 20px;text-align:center;color:var(--sub)}
+  .title-main{font-weight:600}
+  .title-sub{color:var(--sub);font-size:12px;margin-top:2px}
+  .spoiler-tag{color:var(--danger);font-size:11px;border:1px solid var(--danger);
+    border-radius:5px;padding:0 5px;margin-left:6px}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);
+    display:none;align-items:flex-start;justify-content:center;
+    padding:30px 16px;overflow:auto;z-index:20}
+  .overlay.open{display:flex}
+  .modal{background:var(--panel);border-radius:14px;width:100%;max-width:560px;
+    border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h2{margin:0;padding:16px 20px;font-size:16px;border-bottom:1px solid var(--line)}
+  .modal .body{padding:16px 20px;display:grid;gap:13px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  label{display:block;font-size:12.5px;color:var(--sub);margin-bottom:4px}
+  .starpick{font-size:24px;color:var(--line);cursor:pointer;user-select:none;letter-spacing:3px}
+  .starpick .on{color:var(--star)}
+  .checkrow{display:flex;align-items:center;gap:8px}
+  .checkrow input{width:auto}
+  .checkrow label{margin:0}
+  .modal .foot{padding:14px 20px;border-top:1px solid var(--line);
+    display:flex;gap:10px;justify-content:space-between;align-items:center}
+  .foot .right{display:flex;gap:10px}
+  .btn.danger{color:var(--danger);border-color:var(--danger);background:transparent}
+  .btn.danger:hover{background:var(--danger);color:#fff}
+  .memo-hidden{color:var(--sub);font-style:italic;cursor:pointer}
+  .hint{color:var(--sub);font-size:11.5px;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>通過シナリオ管理 <span style="font-weight:400;color:var(--sub);font-size:14px">TRPG / マダミス</span></h1>
+  <div class="sub">通過したシナリオと「誰と通過したか」を記録。データはこのブラウザに自動保存されます。</div>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <div class="grow"><input id="search" type="text" placeholder="🔍 シナリオ名・メンバー・メモを検索"></div>
+    <select id="fKind" style="width:auto">
+      <option value="">種別：すべて</option>
+      <option value="TRPG">TRPG</option>
+      <option value="マダミス">マダミス</option>
+    </select>
+    <select id="fSystem" style="width:auto"><option value="">システム：すべて</option></select>
+    <button class="btn primary" id="addBtn">＋ 追加</button>
+    <button class="btn ghost" id="exportBtn">JSON書き出し</button>
+    <button class="btn ghost" id="importBtn">JSON読み込み</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" data-key="title">シナリオ名 <span class="arrow"></span></th>
+          <th class="sortable" data-key="kind">種別 <span class="arrow"></span></th>
+          <th class="sortable" data-key="system">システム <span class="arrow"></span></th>
+          <th class="sortable" data-key="playedOn">通過日 <span class="arrow"></span></th>
+          <th>メンバー</th>
+          <th class="sortable" data-key="rating">満足度 <span class="arrow"></span></th>
+          <th>リンク</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none">まだ登録がありません。「＋ 追加」から記録しましょう。</div>
+  </div>
+</div>
+
+<!-- edit modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">シナリオを追加</h2>
+    <div class="body">
+      <div>
+        <label>シナリオ名 <span style="color:var(--danger)">*</span></label>
+        <input id="f_title" type="text" placeholder="例：狂気山脈">
+      </div>
+      <div class="grid2">
+        <div>
+          <label>種別</label>
+          <select id="f_kind"><option>TRPG</option><option>マダミス</option></select>
+        </div>
+        <div>
+          <label>システム</label>
+          <input id="f_system" type="text" list="systemList" placeholder="CoC7版 / エモクロア / マダミス 等">
+          <datalist id="systemList"></datalist>
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label>通過日</label>
+          <input id="f_playedOn" type="date">
+        </div>
+        <div>
+          <label>KP / GM 担当</label>
+          <input id="f_keeper" type="text" placeholder="例：自分 / 〇〇さん">
+        </div>
+      </div>
+      <div>
+        <label>一緒に通過したメンバー</label>
+        <input id="f_members" type="text" placeholder="例：Aさん, Bさん, Cさん（カンマ区切り）">
+      </div>
+      <div>
+        <label>自分のPC・役割</label>
+        <input id="f_myRole" type="text" placeholder="例：探索者〇〇 / 犯人役 など">
+      </div>
+      <div>
+        <label>満足度</label>
+        <div class="starpick" id="starpick" data-val="0"></div>
+      </div>
+      <div>
+        <label>ひとことメモ</label>
+        <textarea id="f_memo" placeholder="感想など"></textarea>
+        <div class="checkrow" style="margin-top:8px">
+          <input type="checkbox" id="f_spoiler">
+          <label for="f_spoiler">ネタバレを含む（一覧では折りたたむ）</label>
+        </div>
+      </div>
+      <div>
+        <label>配布ページ URL（TALTO / BOOTH 等）</label>
+        <input id="f_url" type="url" placeholder="https://">
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn danger" id="deleteBtn" style="display:none">削除</button>
+      <div class="right">
+        <button class="btn ghost" id="cancelBtn">キャンセル</button>
+        <button class="btn primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const KEY = "scenario-log-v1";
+const SYSTEM_SUGGEST = ["CoC6版","CoC7版","エモクロア","マダミス","その他"];
+
+let state = load();
+let editingId = null;
+let sortKey = "playedOn", sortDir = -1; // 既定：通過日の新しい順
+
+/* ---------- storage ---------- */
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return {version:1, items:[]};
+    const d = JSON.parse(raw);
+    if(!Array.isArray(d.items)) return {version:1, items:[]};
+    return d;
+  }catch(e){ return {version:1, items:[]}; }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function starHTML(n){
+  n = Number(n)||0;
+  let h="";
+  for(let i=1;i<=5;i++) h += i<=n ? "★" : "<span class='off'>★</span>";
+  return "<span class='stars'>"+h+"</span>";
+}
+
+/* ---------- render ---------- */
+function refreshSystemOptions(){
+  const set = new Set(SYSTEM_SUGGEST);
+  state.items.forEach(x=>{ if(x.system) set.add(x.system); });
+  const arr = [...set];
+  const fSys = $("#fSystem"), cur = fSys.value;
+  fSys.innerHTML = '<option value="">システム：すべて</option>' +
+    arr.map(s=>`<option>${esc(s)}</option>`).join("");
+  fSys.value = cur;
+  $("#systemList").innerHTML = arr.map(s=>`<option value="${esc(s)}">`).join("");
+}
+
+function currentView(){
+  const q = $("#search").value.trim().toLowerCase();
+  const fk = $("#fKind").value, fs = $("#fSystem").value;
+  let items = state.items.filter(x=>{
+    if(fk && x.kind!==fk) return false;
+    if(fs && x.system!==fs) return false;
+    if(q){
+      const hay = [x.title,x.members,x.memo,x.myRole,x.keeper,x.system].join(" ").toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  items.sort((a,b)=>{
+    let va=a[sortKey], vb=b[sortKey];
+    if(sortKey==="rating"){ va=Number(va)||0; vb=Number(vb)||0; }
+    else { va=(va||"").toString().toLowerCase(); vb=(vb||"").toString().toLowerCase(); }
+    if(va<vb) return -1*sortDir;
+    if(va>vb) return 1*sortDir;
+    return 0;
+  });
+  return items;
+}
+
+function render(){
+  refreshSystemOptions();
+  const items = currentView();
+  const tb = $("#tbody");
+  tb.innerHTML = items.map(x=>{
+    const memberChips = (x.members||"").split(/[,、]/).map(s=>s.trim()).filter(Boolean)
+      .map(m=>`<span class="chip">${esc(m)}</span>`).join(" ") || '<span style="color:var(--sub)">—</span>';
+    const link = x.url ? `<span class="linkcell"><a href="${esc(x.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">開く ↗</a></span>` : '<span style="color:var(--sub)">—</span>';
+    const spoiler = x.spoiler ? '<span class="spoiler-tag">ネタバレ</span>' : '';
+    const sub = x.myRole ? `<div class="title-sub">役割：${esc(x.myRole)}${spoiler}</div>` : (spoiler?`<div class="title-sub">${spoiler}</div>`:'');
+    return `<tr data-id="${x.id}">
+      <td><div class="title-main">${esc(x.title)||'(無題)'}</div>${sub}</td>
+      <td><span class="kind ${esc(x.kind)}">${esc(x.kind)}</span></td>
+      <td>${x.system?`<span class="chip">${esc(x.system)}</span>`:'—'}</td>
+      <td style="white-space:nowrap">${esc(x.playedOn)||'—'}</td>
+      <td class="members">${memberChips}</td>
+      <td>${x.rating?starHTML(x.rating):'—'}</td>
+      <td>${link}</td>
+    </tr>`;
+  }).join("");
+  $("#empty").style.display = items.length? "none":"block";
+  $("#count").textContent = `${items.length} / ${state.items.length} 件`;
+  // sort arrows
+  document.querySelectorAll("th.sortable").forEach(th=>{
+    const a = th.querySelector(".arrow");
+    a.textContent = th.dataset.key===sortKey ? (sortDir>0?"▲":"▼") : "";
+  });
+}
+
+/* ---------- modal ---------- */
+function setStars(n){
+  const sp = $("#starpick"); sp.dataset.val = n;
+  sp.innerHTML = "";
+  for(let i=1;i<=5;i++){
+    const s = document.createElement("span");
+    s.textContent = "★"; s.dataset.i = i;
+    if(i<=n) s.className="on";
+    sp.appendChild(s);
+  }
+}
+$("#starpick").addEventListener("click", e=>{
+  if(e.target.dataset.i){
+    let i = Number(e.target.dataset.i);
+    if(i===Number($("#starpick").dataset.val)) i=0; // 同じ星を再クリックで解除
+    setStars(i);
+  }
+});
+
+function openModal(item){
+  editingId = item ? item.id : null;
+  $("#modalTitle").textContent = item ? "シナリオを編集" : "シナリオを追加";
+  $("#deleteBtn").style.display = item ? "inline-block" : "none";
+  const v = item || {};
+  $("#f_title").value = v.title||"";
+  $("#f_kind").value = v.kind||"TRPG";
+  $("#f_system").value = v.system||"";
+  $("#f_playedOn").value = v.playedOn||"";
+  $("#f_keeper").value = v.keeper||"";
+  $("#f_members").value = v.members||"";
+  $("#f_myRole").value = v.myRole||"";
+  $("#f_memo").value = v.memo||"";
+  $("#f_spoiler").checked = !!v.spoiler;
+  $("#f_url").value = v.url||"";
+  setStars(Number(v.rating)||0);
+  $("#overlay").classList.add("open");
+  $("#f_title").focus();
+}
+function closeModal(){ $("#overlay").classList.remove("open"); editingId=null; }
+
+function saveModal(){
+  const title = $("#f_title").value.trim();
+  if(!title){ alert("シナリオ名を入力してください。"); $("#f_title").focus(); return; }
+  const data = {
+    title,
+    kind: $("#f_kind").value,
+    system: $("#f_system").value.trim(),
+    playedOn: $("#f_playedOn").value,
+    keeper: $("#f_keeper").value.trim(),
+    members: $("#f_members").value.trim(),
+    myRole: $("#f_myRole").value.trim(),
+    rating: Number($("#starpick").dataset.val)||0,
+    memo: $("#f_memo").value.trim(),
+    spoiler: $("#f_spoiler").checked,
+    url: $("#f_url").value.trim()
+  };
+  if(editingId){
+    const it = state.items.find(x=>x.id===editingId);
+    Object.assign(it, data);
+  }else{
+    state.items.push(Object.assign({id:uid(), createdAt:new Date().toISOString()}, data));
+  }
+  save(); render(); closeModal();
+}
+
+function deleteCurrent(){
+  if(!editingId) return;
+  const it = state.items.find(x=>x.id===editingId);
+  if(confirm(`「${it?it.title:''}」を削除します。よろしいですか？`)){
+    state.items = state.items.filter(x=>x.id!==editingId);
+    save(); render(); closeModal();
+  }
+}
+
+/* ---------- import / export ---------- */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  const d = new Date().toISOString().slice(0,10);
+  a.href = URL.createObjectURL(blob);
+  a.download = `scenario-log_${d}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importJSON(file){
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      const incoming = Array.isArray(d)? d : (Array.isArray(d.items)? d.items : null);
+      if(!incoming) throw new Error("形式が不正です");
+      const mode = confirm(`${incoming.length} 件を読み込みます。\n\n[OK] 現在のデータに追加（マージ）\n[キャンセル] 現在のデータを置き換え`);
+      const cleaned = incoming.map(x=>Object.assign({id:uid(),createdAt:new Date().toISOString()},x, x.id?{id:x.id}:{}));
+      if(mode){
+        const ids = new Set(state.items.map(x=>x.id));
+        cleaned.forEach(x=>{ if(ids.has(x.id)) x.id=uid(); state.items.push(x); });
+      }else{
+        state.items = cleaned;
+      }
+      save(); render();
+      alert("読み込みが完了しました。");
+    }catch(e){ alert("読み込みに失敗しました：" + e.message); }
+  };
+  r.readAsText(file);
+}
+
+/* ---------- events ---------- */
+$("#addBtn").onclick = ()=>openModal(null);
+$("#cancelBtn").onclick = closeModal;
+$("#saveBtn").onclick = saveModal;
+$("#deleteBtn").onclick = deleteCurrent;
+// モーダル外クリックでは閉じない（入力保護）。閉じるのはキャンセル/保存/削除のみ。
+$("#tbody").addEventListener("click", e=>{
+  const tr = e.target.closest("tr[data-id]");
+  if(!tr) return;
+  const it = state.items.find(x=>x.id===tr.dataset.id);
+  if(it) openModal(it);
+});
+$("#search").oninput = render;
+$("#fKind").onchange = render;
+$("#fSystem").onchange = render;
+document.querySelectorAll("th.sortable").forEach(th=>{
+  th.onclick = ()=>{
+    const k = th.dataset.key;
+    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir = (k==="playedOn"||k==="rating")?-1:1; }
+    render();
+  };
+});
+$("#exportBtn").onclick = exportJSON;
+$("#importBtn").onclick = ()=>$("#importFile").click();
+$("#importFile").onchange = e=>{ if(e.target.files[0]){ importJSON(e.target.files[0]); e.target.value=""; } };
+
+render();
+</script>
+</body>
+</html>

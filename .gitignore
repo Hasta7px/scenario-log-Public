@@ -1,0 +1,9 @@
+# エクスポートしたシナリオ記録（個人データなのでコミットしない）
+scenario-log_*.json
+
+# OS / エディタ
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

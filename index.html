@@ -115,8 +115,17 @@
     <button class="btn primary" id="addBtn">＋ 追加</button>
     <button class="btn ghost" id="exportBtn">JSON書き出し</button>
     <button class="btn ghost" id="importBtn">JSON読み込み</button>
+    <button class="btn ghost" id="shareBtn">共有リンクを作る</button>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     <span class="count" id="count"></span>
+  </div>
+
+  <div id="sharedNote" style="display:none;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);
+       border-left:4px solid var(--accent);border-radius:6px;background:var(--panel);font-size:13px">
+    <b>共有リンクを表示中（閲覧専用）</b><br>
+    <span style="color:var(--sub)">このデータはリンクの中に入っており、保存も送信もされません。自分の記録として使いたい場合は
+    「JSON書き出し」で保存し、通常のページで「JSON読み込み」してください。</span>
+    <div style="margin-top:8px"><a id="ownLink" href="#">→ 自分の記録を開く</a></div>
   </div>
 
   <div class="tablewrap">
@@ -209,6 +218,7 @@ const KEY = "scenario-log-v1";
 const SYSTEM_SUGGEST = ["CoC6版","CoC7版","エモクロア","マダミス","その他"];
 
 let state = load();
+let isSharedView = false;
 let editingId = null;
 let sortKey = "playedOn", sortDir = -1; // 既定：通過日の新しい順
 
@@ -222,7 +232,8 @@ function load(){
     return d;
   }catch(e){ return {version:1, items:[]}; }
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+// 共有リンク表示中は、閲覧者のデータを壊さないよう保存しない
+function save(){ if(isSharedView) return; localStorage.setItem(KEY, JSON.stringify(state)); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 /* ---------- helpers ---------- */
@@ -373,6 +384,68 @@ function deleteCurrent(){
   }
 }
 
+/* ---------- 共有リンク ----------
+   データを圧縮して URL の # 以降に載せる。# はサーバーへ送信されないため、
+   GitHub Pages 側にはデータが一切残らず、検索エンジンにも拾われない。 */
+const b64enc = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const b64dec = s => Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")), c=>c.charCodeAt(0));
+
+async function encodeShare(items){
+  const raw = new TextEncoder().encode(JSON.stringify(items));
+  if(typeof CompressionStream === "undefined") return "0" + b64enc(raw); // 非対応ブラウザは無圧縮
+  const cs = new CompressionStream("gzip");
+  const w = cs.writable.getWriter(); w.write(raw); w.close();
+  return "1" + b64enc(new Uint8Array(await new Response(cs.readable).arrayBuffer()));
+}
+async function decodeShare(payload){
+  const bytes = b64dec(payload.slice(1));
+  let json;
+  if(payload[0] === "1"){
+    const ds = new DecompressionStream("gzip");
+    const w = ds.writable.getWriter(); w.write(bytes); w.close();
+    json = await new Response(ds.readable).text();
+  }else{
+    json = new TextDecoder().decode(bytes);
+  }
+  const items = JSON.parse(json);
+  if(!Array.isArray(items)) throw new Error("形式が不正です");
+  return items;
+}
+
+async function makeShareLink(){
+  if(state.items.length === 0){ alert("共有できるデータがありません。"); return; }
+  try{
+    const payload = await encodeShare(state.items);
+    const base = location.origin === "null" ? location.href.split("#")[0] : location.origin + location.pathname;
+    const url = base + "#s=" + payload;
+    // 長すぎるリンクはメッセージアプリ側で切られることがあるため事前に警告
+    const warn = url.length > 8000 ? `\n\n※ 長さ ${url.length.toLocaleString()} 文字。アプリによっては途中で切れることがあります。` : "";
+    try{
+      await navigator.clipboard.writeText(url);
+      alert(`共有リンクをコピーしました（${state.items.length} 件）。${warn}`);
+    }catch(e){
+      prompt("共有リンクです。コピーして渡してください。", url);
+    }
+  }catch(e){ alert("共有リンクの作成に失敗しました：" + e.message); }
+}
+
+async function initSharedView(payload){
+  try{
+    const items = await decodeShare(payload);
+    state = {version:1, items};
+    isSharedView = true;
+    $("#sharedNote").style.display = "block";
+    $("#ownLink").href = location.pathname || "./";
+    // 閲覧専用にする（書き出しだけは残し、控えを取れるようにする）
+    $("#addBtn").style.display = "none";
+    $("#shareBtn").style.display = "none";
+    $("#importBtn").style.display = "none";
+    render();
+  }catch(e){
+    alert("共有リンクを読み込めませんでした。リンクが途中で切れている可能性があります。\n（" + e.message + "）");
+  }
+}
+
 /* ---------- import / export ---------- */
 function exportJSON(){
   const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
@@ -412,6 +485,7 @@ $("#saveBtn").onclick = saveModal;
 $("#deleteBtn").onclick = deleteCurrent;
 // モーダル外クリックでは閉じない（入力保護）。閉じるのはキャンセル/保存/削除のみ。
 $("#tbody").addEventListener("click", e=>{
+  if(isSharedView) return; // 共有リンクの閲覧中は編集させない
   const tr = e.target.closest("tr[data-id]");
   if(!tr) return;
   const it = state.items.find(x=>x.id===tr.dataset.id);
@@ -430,8 +504,12 @@ document.querySelectorAll("th.sortable").forEach(th=>{
 $("#exportBtn").onclick = exportJSON;
 $("#importBtn").onclick = ()=>$("#importFile").click();
 $("#importFile").onchange = e=>{ if(e.target.files[0]){ importJSON(e.target.files[0]); e.target.value=""; } };
+$("#shareBtn").onclick = makeShareLink;
 
-render();
+/* ---------- 初期表示 ----------
+   URL に #s=... が付いていれば共有リンクの閲覧モード。無ければ通常どおり自分のデータ。 */
+const shared = location.hash.startsWith("#s=") ? location.hash.slice(3) : null;
+if(shared){ initSharedView(shared); } else { render(); }
 </script>
 </body>
 </html>
